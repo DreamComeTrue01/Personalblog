@@ -2,7 +2,7 @@
   <div class="home-view">
     <!-- 文章列表 -->
     <div class="article-list">
-      <article v-for="(article, index) in articles" :key="article.id" class="article-card" :class="`card-${index % 4 + 1}`">
+      <article v-for="(article, index) in articles" :key="article.id" class="article-card" :class="`card-${index % 4 + 1}`" @click="navigateToArticle(article.id)">
         <h2 class="article-title">{{ article.title }}</h2>
         <div class="article-meta">
           <span class="article-date">{{ article.date }}</span>
@@ -23,53 +23,89 @@
 </template>
 
 <script setup>
-// 模拟文章数据
-const articles = [
-  {
-    id: 1,
-    title: '2025年终总结',
-    date: '2月24日 , 2026 | 18:24',
-    categories: ['生活'],
-    excerpt: '2025 年终总结。诈尸一下，马上就是 2026 年了，哈哈哈。过得太快了吧。期间还想着水水文章的，结果完全没有了本科期间的热情，能写个年终总结就不错了。',
-    stats: {
-      likes: 9,
-      comments: 12
-    }
-  },
-  {
-    id: 2,
-    title: '实习小记',
-    date: '2月18日 , 2025 | 11:16',
-    categories: ['生活', 'Learn'],
-    excerpt: '月记。最近想趁着没啥课，导师管的松的时候出去找个实习，结果一个也没找到，2333。',
-    stats: {
-      likes: 5,
-      comments: 8
-    }
-  },
-  {
-    id: 3,
-    title: '2024年终总结',
-    date: '1月2日 , 2025 | 14:23',
-    categories: ['生活'],
-    excerpt: '光阴似骏马加鞭，浮世似落花流水。大学生活结束了～考完了，感觉这一年白费了，害，后面再说吧，下面就是准备没有工资还要交钱的实习了，以及毕设，顺便整理下博客吧。',
-    stats: {
-      likes: 12,
-      comments: 15
-    }
-  },
-  {
-    id: 4,
-    title: 'Argon主题博客美化',
-    date: '10月21日 , 2022 | 18:09',
-    categories: ['建站', 'Learn'],
-    excerpt: '关于 Argon 主题的相关美化文档。新增 WP 用户头像插件。',
-    stats: {
-      likes: 18,
-      comments: 23
-    }
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const articles = ref([])
+
+// 加载文章数据
+const loadArticles = () => {
+  const savedArticles = localStorage.getItem('articles')
+  if (savedArticles) {
+    articles.value = JSON.parse(savedArticles)
+  } else {
+    // 初始化默认数据
+    const defaultArticles = [
+      {
+        id: 1,
+        title: '2025年终总结',
+        date: '2026-02-24',
+        categories: ['生活'],
+        excerpt: '2025 年终总结。诈尸一下，马上就是 2026 年了，哈哈哈。过得太快了吧。期间还想着水水文章的，结果完全没有了本科期间的热情，能写个年终总结就不错了。',
+        stats: {
+          likes: 9,
+          comments: 12
+        }
+      },
+      {
+        id: 2,
+        title: '实习小记',
+        date: '2025-02-18',
+        categories: ['生活', 'Learn'],
+        excerpt: '月记。最近想趁着没啥课，导师管的松的时候出去找个实习，结果一个也没找到，2333。',
+        stats: {
+          likes: 5,
+          comments: 8
+        }
+      },
+      {
+        id: 3,
+        title: '2024年终总结',
+        date: '2025-01-02',
+        categories: ['生活'],
+        excerpt: '光阴似骏马加鞭，浮世似落花流水。大学生活结束了～考完了，感觉这一年白费了，害，后面再说吧，下面就是准备没有工资还要交钱的实习了，以及毕设，顺便整理下博客吧。',
+        stats: {
+          likes: 12,
+          comments: 15
+        }
+      },
+      {
+        id: 4,
+        title: 'Argon主题博客美化',
+        date: '2022-10-21',
+        categories: ['建站', 'Learn'],
+        excerpt: '关于 Argon 主题的相关美化文档。新增 WP 用户头像插件。',
+        stats: {
+          likes: 18,
+          comments: 23
+        }
+      }
+    ]
+    articles.value = defaultArticles
+    localStorage.setItem('articles', JSON.stringify(defaultArticles))
   }
-]
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const year = date.getFullYear()
+  return `${month}月${day}日 , ${year}`
+}
+
+// 导航到文章详情页
+const navigateToArticle = (id) => {
+  router.push(`/article/${id}`)
+}
+
+onMounted(() => {
+  loadArticles()
+  // 监听localStorage变化，实时更新文章列表
+  window.addEventListener('storage', loadArticles)
+})
 </script>
 
 <style scoped>

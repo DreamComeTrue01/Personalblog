@@ -5,6 +5,11 @@
       <router-view />
     </template>
     
+    <!-- 文章详情页 -->
+    <template v-else-if="$route.path.startsWith('/article/')">
+      <router-view />
+    </template>
+    
     <!-- 博客页面 -->
     <template v-else>
       <!-- 顶部导航栏 -->

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import PortalView from '../views/PortalView.vue'
+import ArticleDetailView from '../views/ArticleDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -34,6 +35,11 @@ const router = createRouter({
       path: '/archive/:year/:month',
       name: 'archive',
       component: HomeView
+    },
+    {
+      path: '/article/:id',
+      name: 'article',
+      component: ArticleDetailView
     }
   ]
 })
