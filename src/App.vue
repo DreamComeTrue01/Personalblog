@@ -16,6 +16,7 @@
       <header class="top-nav">
         <div class="nav-content">
           <div class="nav-left">
+            <button class="back-btn" @click="goBack">← 返回</button>
             <h1 class="blog-name">Dream's blog</h1>
             <p class="blog-slogan">Life is a coding, I will debug it.</p>
           </div>
@@ -52,9 +53,10 @@
             <!-- 博主头像模块 -->
             <div class="sidebar-module">
               <div class="avatar-container">
-                <div class="avatar"></div>
+                <img src="@/assets/images/avatar.png" alt="Avatar" class="avatar-img">
               </div>
-              <p class="avatar-desc">一个普通的程序员</p>
+              <h4 class="profile-name">Dream</h4>
+              <p class="avatar-desc">记录生活，分享知识</p>
             </div>
             
             <!-- 分类列表 -->
@@ -108,6 +110,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
+const router = useRouter()
+
 // 主题模式
 const currentMode = ref('light')
 // 侧边栏状态（移动端）
@@ -129,6 +133,11 @@ const toggleMode = () => {
 // 切换侧边栏（移动端）
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value
+}
+
+// 返回上一页
+const goBack = () => {
+  router.back()
 }
 
 // 初始化主题模式
@@ -156,23 +165,33 @@ body {
 
 /* 主题模式样式 */
 .app-container.light {
-  background-color: #f8f9fa;
+  background: url('@/assets/images/backgrounds/light-bg.jpg');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
   color: #333333;
 }
 
 .app-container.dark {
-  background-color: #121212;
+  background: url('@/assets/images/backgrounds/dark-bg.jpg');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
   color: #eaeaea;
 }
 
 .app-container.black {
-  background-color: #000000;
+  background: url('@/assets/images/backgrounds/black-bg.jpg');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
   color: #e0e0e0;
 }
 
 /* 根路径特殊样式 - 移除背景色以显示森林背景 */
 .app-container:has(> [data-route="/"]) {
-  background-color: transparent;
+  background: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=misty%20forest%20with%20sunlight%20streaming%20through%20trees%2C%20peaceful%20natural%20landscape&image_size=landscape_16_9') no-repeat center center fixed;
+  background-size: cover;
 }
 
 /* 顶部导航栏 */
@@ -182,21 +201,24 @@ body {
   left: 0;
   right: 0;
   height: 60px;
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #ebeef5;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 244, 250, 0.98));
+  backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(173, 216, 230, 0.5);
   z-index: 999;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 16px rgba(100, 149, 237, 0.15);
 }
 
 .app-container.dark .top-nav {
-  background-color: rgba(18, 18, 18, 0.8);
-  border-bottom: 1px solid #222222;
+  background: linear-gradient(135deg, rgba(20, 20, 30, 0.98), rgba(24, 24, 36, 0.98));
+  border-bottom: 1px solid rgba(70, 130, 180, 0.3);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
 }
 
 .app-container.black .top-nav {
-  background-color: rgba(0, 0, 0, 0.8);
-  border-bottom: 1px solid #222222;
+  background: linear-gradient(135deg, rgba(10, 10, 20, 0.98), rgba(17, 17, 25, 0.98));
+  border-bottom: 1px solid rgba(50, 80, 120, 0.3);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
 }
 
 .nav-content {
@@ -215,64 +237,152 @@ body {
   gap: 16px;
 }
 
+.back-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4a6fa5, #6b8cce);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(74, 111, 165, 0.2);
+}
+
+.back-btn:hover {
+  background: linear-gradient(135deg, #3a5a85, #4a6fa5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+}
+
+.app-container.dark .back-btn {
+  background: linear-gradient(135deg, #333333, #444444);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app-container.dark .back-btn:hover {
+  background: linear-gradient(135deg, #444444, #555555);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.app-container.black .back-btn {
+  background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.app-container.black .back-btn:hover {
+  background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
 .blog-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: #4a6fa5;
+  text-shadow: 0 1px 2px rgba(74, 111, 165, 0.1);
+  transition: all 0.3s ease;
+}
+
+.blog-name:hover {
+  color: #3a5a85;
+  text-shadow: 0 1px 4px rgba(74, 111, 165, 0.2);
 }
 
 .blog-slogan {
   font-size: 14px;
-  color: #909399;
+  color: #6c757d;
   white-space: nowrap;
+  font-style: italic;
+  transition: all 0.3s ease;
+}
+
+.app-container.dark .blog-name {
+  color: #6b8cce;
+  text-shadow: 0 1px 2px rgba(107, 140, 206, 0.2);
+}
+
+.app-container.dark .blog-name:hover {
+  color: #4a6fa5;
 }
 
 .app-container.dark .blog-slogan,
 .app-container.black .blog-slogan {
-  color: #666666;
+  color: #888888;
+}
+
+.app-container.black .blog-name {
+  color: #6b8cce;
 }
 
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
 .main-nav {
   display: flex;
-  gap: 20px;
+  gap: 24px;
 }
 
 .nav-link {
   font-size: 16px;
-  color: #909399;
+  font-weight: 500;
+  color: #6c757d;
   text-decoration: none;
   transition: all 0.3s ease;
   position: relative;
+  padding: 8px 12px;
+  border-radius: 8px;
 }
 
 .nav-link:hover {
-  color: #5e72e4;
+  color: #4a6fa5;
+  background-color: rgba(74, 111, 165, 0.1);
+  transform: translateY(-2px);
 }
 
 .nav-link::after {
   content: '';
   position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 0;
-  height: 1px;
-  background-color: #5e72e4;
-  transition: width 0.3s ease;
+  bottom: -2px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: linear-gradient(90deg, #4a6fa5, #6b8cce);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+  border-radius: 2px;
 }
 
 .nav-link:hover::after {
-  width: 100%;
+  transform: scaleX(1);
 }
 
-.app-container.dark .nav-link,
+.app-container.dark .nav-link {
+  color: #999999;
+}
+
+.app-container.dark .nav-link:hover {
+  color: #6b8cce;
+  background-color: rgba(107, 140, 206, 0.1);
+}
+
+.app-container.dark .nav-link::after {
+  background: linear-gradient(90deg, #6b8cce, #4a6fa5);
+}
+
 .app-container.black .nav-link {
-  color: #666666;
+  color: #888888;
+}
+
+.app-container.black .nav-link:hover {
+  color: #6b8cce;
+  background-color: rgba(107, 140, 206, 0.1);
 }
 
 .mode-toggle {
@@ -360,22 +470,38 @@ body {
 
 /* 侧边栏模块 */
 .sidebar-module {
-  background-color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  padding: 16px;
-  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(100, 149, 237, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
   transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+}
+
+.sidebar-module:hover {
+  box-shadow: 0 6px 20px rgba(100, 149, 237, 0.15);
+  transform: translateY(-2px);
 }
 
 .app-container.dark .sidebar-module {
-  background-color: #181818;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: #181818;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid #333333;
+}
+
+.app-container.dark .sidebar-module:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .app-container.black .sidebar-module {
-  background-color: #111111;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #111111;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid #222222;
+}
+
+.app-container.black .sidebar-module:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .module-title {
@@ -389,25 +515,95 @@ body {
 .avatar-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  position: relative;
 }
 
-.avatar {
-  width: 80px;
-  height: 80px;
+.avatar-img {
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
-  background-color: #5e72e4;
+  object-fit: cover;
+  border: 3px solid #4a6fa5;
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+  transition: all 0.3s ease;
+}
+
+.avatar-img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(74, 111, 165, 0.4);
+}
+
+.profile-name {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+  color: #4a6fa5;
+  text-shadow: 0 1px 2px rgba(74, 111, 165, 0.1);
+  transition: all 0.3s ease;
+}
+
+.profile-name:hover {
+  color: #3a5a85;
+  text-shadow: 0 1px 4px rgba(74, 111, 165, 0.2);
 }
 
 .avatar-desc {
   text-align: center;
   font-size: 14px;
-  color: #909399;
+  color: #6c757d;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  font-style: italic;
+  transition: all 0.3s ease;
 }
 
-.app-container.dark .avatar-desc,
+.avatar-desc:hover {
+  color: #495057;
+}
+
+.app-container.dark .avatar-img {
+  border-color: #6b8cce;
+  box-shadow: 0 4px 12px rgba(107, 140, 206, 0.3);
+}
+
+.app-container.dark .avatar-img:hover {
+  box-shadow: 0 6px 16px rgba(107, 140, 206, 0.4);
+}
+
+.app-container.dark .profile-name {
+  color: #6b8cce;
+  text-shadow: 0 1px 2px rgba(107, 140, 206, 0.2);
+}
+
+.app-container.dark .profile-name:hover {
+  color: #4a6fa5;
+}
+
+.app-container.dark .avatar-desc {
+  color: #888888;
+}
+
+.app-container.dark .avatar-desc:hover {
+  color: #999999;
+}
+
+.app-container.black .avatar-img {
+  border-color: #6b8cce;
+  box-shadow: 0 4px 12px rgba(107, 140, 206, 0.2);
+}
+
+.app-container.black .profile-name {
+  color: #6b8cce;
+}
+
 .app-container.black .avatar-desc {
-  color: #666666;
+  color: #777777;
+}
+
+.app-container.black .avatar-desc:hover {
+  color: #888888;
 }
 
 /* 分类列表 */
@@ -417,20 +613,29 @@ body {
 
 .category-item {
   display: block;
-  padding: 4px 0;
+  padding: 8px 12px;
   font-size: 14px;
-  color: #909399;
+  color: #6c757d;
   text-decoration: none;
   transition: all 0.3s ease;
+  border-radius: 6px;
+  margin-bottom: 6px;
 }
 
 .category-item:hover {
-  color: #5e72e4;
+  color: #4a6fa5;
+  background-color: rgba(74, 111, 165, 0.1);
+  transform: translateX(4px);
 }
 
 .app-container.dark .category-item,
 .app-container.black .category-item {
-  color: #666666;
+  color: #999999;
+}
+
+.app-container.dark .category-item:hover {
+  color: #6b8cce;
+  background-color: rgba(107, 140, 206, 0.1);
 }
 
 /* 标签云 */
@@ -442,18 +647,29 @@ body {
 
 .tag {
   font-size: 14px;
-  color: #909399;
+  color: #6c757d;
   cursor: pointer;
   transition: all 0.3s ease;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .tag:hover {
-  color: #5e72e4;
+  color: #4a6fa5;
+  background-color: rgba(74, 111, 165, 0.1);
+  transform: translateY(-2px);
 }
 
 .app-container.dark .tag,
 .app-container.black .tag {
-  color: #666666;
+  color: #999999;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.app-container.dark .tag:hover {
+  color: #6b8cce;
+  background-color: rgba(107, 140, 206, 0.1);
 }
 
 /* 归档列表 */
@@ -463,20 +679,29 @@ body {
 
 .archive-item {
   display: block;
-  padding: 4px 0;
+  padding: 8px 12px;
   font-size: 14px;
-  color: #909399;
+  color: #6c757d;
   text-decoration: none;
   transition: all 0.3s ease;
+  border-radius: 6px;
+  margin-bottom: 6px;
 }
 
 .archive-item:hover {
-  color: #5e72e4;
+  color: #4a6fa5;
+  background-color: rgba(74, 111, 165, 0.1);
+  transform: translateX(4px);
 }
 
 .app-container.dark .archive-item,
 .app-container.black .archive-item {
-  color: #666666;
+  color: #999999;
+}
+
+.app-container.dark .archive-item:hover {
+  color: #6b8cce;
+  background-color: rgba(107, 140, 206, 0.1);
 }
 
 /* 页脚 */

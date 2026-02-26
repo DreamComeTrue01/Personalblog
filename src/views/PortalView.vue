@@ -1,5 +1,5 @@
 <template>
-  <div class="portal-view" data-route="/">
+  <div class="portal-view" data-route="/" :class="currentMode">
     <!-- 导航栏 -->
     <header class="portal-nav" :class="{ 'scrolled': isScrolled }">
       <div class="nav-content">
@@ -9,9 +9,10 @@
         <nav class="main-nav">
           <router-link to="/" class="nav-link">首页</router-link>
           <router-link to="/blog" class="nav-link">文章</router-link>
-          <router-link to="/blog" class="nav-link">碎碎念</router-link>
-          <router-link to="/blog" class="nav-link">关于</router-link>
-          <router-link to="/blog" class="nav-link">留言板</router-link>
+          <router-link to="/life" class="nav-link">碎碎念</router-link>
+          <router-link to="/archive" class="nav-link">归档</router-link>
+          <router-link to="/about" class="nav-link">关于</router-link>
+          <router-link to="/message" class="nav-link">留言板</router-link>
         </nav>
         <div class="nav-right">
           <button class="search-btn" aria-label="搜索">🔍</button>
@@ -57,13 +58,13 @@
         <!-- 左侧侧边栏 -->
         <aside class="left-sidebar">
           <!-- 公告栏 -->
-          <div class="sidebar-module announcement">
+          <div class="sidebar-module announcement" style="animation-delay: 0.1s;">
             <h3 class="module-title">小窝公告栏</h3>
             <p class="announcement-content">天行健，君子以自强不息</p>
           </div>
           
           <!-- 导航菜单 -->
-          <div class="sidebar-module navigation">
+          <div class="sidebar-module navigation" style="animation-delay: 0.2s;">
             <h3 class="module-title">导航菜单</h3>
             <ul class="nav-menu">
               <li><a href="#" class="nav-item">首页</a></li>
@@ -74,7 +75,7 @@
           </div>
           
           <!-- 个人简介 -->
-          <div class="sidebar-module profile">
+          <div class="sidebar-module profile" style="animation-delay: 0.3s;">
             <!-- 标签页切换 -->
             <div class="profile-tabs">
               <button class="tab-btn" :class="{ active: activeTab === 'profile' }" @click="activeTab = 'profile'">个人简介</button>
@@ -94,15 +95,15 @@
               <!-- 统计数据 -->
               <div class="profile-stats">
                 <div class="stat-item">
-                  <span class="stat-number">74</span>
+                  <span class="stat-number">{{ articles.length }}</span>
                   <span class="stat-label">文章</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-number">18</span>
+                  <span class="stat-number">{{ categories.length }}</span>
                   <span class="stat-label">分类</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-number">18</span>
+                  <span class="stat-number">{{ tags.length }}</span>
                   <span class="stat-label">标签</span>
                 </div>
               </div>
@@ -181,7 +182,7 @@
                           </div>
                           <div class="article-actions csdn-article-actions">
                             <button class="action-btn csdn-edit" @click="handleEditArticle(article)">编辑</button>
-                            <button class="action-btn csdn-delete" @click="handleDeleteArticle(article)">删除</button>
+                            <button class="action-btn csdn-delete" @click="openDeleteModal(article)">删除</button>
                           </div>
                         </div>
                       </div>
@@ -394,17 +395,36 @@
       
       <!-- 右下角图标 -->
       <div class="bottom-right-icons">
+        <div class="progress-icon" aria-label="滚动进度" @click="scrollToTop">
+          <div class="progress-circle" :style="{ '--progress': scrollProgress + '%' }">
+            <span class="progress-text">{{ Math.round(scrollProgress) }}%</span>
+          </div>
+        </div>
         <button class="icon-btn" aria-label="返回顶部" @click="scrollToTop">
           <span class="icon">↑</span>
         </button>
         <button class="icon-btn" aria-label="主题切换" @click="toggleMode">
-          <span class="icon">🌙</span>
+          <span class="icon" v-if="currentMode === 'light'">☀️</span>
+          <span class="icon" v-else-if="currentMode === 'dark'">🌙</span>
+          <span class="icon" v-else>⚫</span>
         </button>
         <button class="icon-btn" aria-label="设置" @click="openSettings">
           <span class="icon">⚙️</span>
         </button>
       </div>
     </section>
+
+    <!-- 删除确认模态框 -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
+      <div class="modal-content" @click.stop>
+        <h3 class="modal-title">确认删除</h3>
+        <p class="modal-message">确定要删除文章: {{ articleToDelete?.title }}吗？</p>
+        <div class="modal-actions">
+          <button class="action-btn" @click="closeDeleteModal">取消</button>
+          <button class="action-btn danger" @click="confirmDelete">确认删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -419,6 +439,7 @@ const isScrolled = ref(false)
 const currentMode = ref('light')
 const activeTab = ref('profile')
 const isDropdownOpen = ref(false)
+const scrollProgress = ref(0)
 // 功能管理
 const activeFeature = ref('')
 // 编辑文章相关
@@ -429,6 +450,9 @@ const currentArticleId = ref(null)
 // 拖放上传相关
 const isDragging = ref(false)
 const fileInput = ref(null)
+// 删除确认模态框相关
+const showDeleteModal = ref(false)
+const articleToDelete = ref(null)
 // 导入头像图片
 import avatarImage from '@/assets/images/avatar.png'
 
@@ -472,7 +496,7 @@ const loadArticles = () => {
         content: '# 2025年终总结\n\n这是2025年的年终总结内容...',
         categories: ['生活'],
         excerpt: '2025 年终总结。诈尸一下，马上就是 2026 年了，哈哈哈。过得太快了吧。期间还想着水水文章的，结果完全没有了本科期间的热情，能写个年终总结就不错了。',
-        stats: { likes: 9, comments: 12 }
+        stats: { likes: 9, comments: 12, views: 0 }
       },
       {
         id: 2, 
@@ -481,7 +505,7 @@ const loadArticles = () => {
         content: '# 实习小记\n\n这是实习期间的记录...',
         categories: ['生活', 'Learn'],
         excerpt: '月记。最近想趁着没啥课，导师管的松的时候出去找个实习，结果一个也没找到，2333。',
-        stats: { likes: 5, comments: 8 }
+        stats: { likes: 5, comments: 8, views: 0 }
       }
     ]
     articles.value = defaultArticles
@@ -564,6 +588,8 @@ const toggleMode = () => {
   }
   // 保存到localStorage
   localStorage.setItem('blogMode', currentMode.value)
+  // 触发storage事件，通知其他组件更新
+  window.dispatchEvent(new Event('storage'))
 }
 
 // 打开设置
@@ -648,11 +674,43 @@ const handleCancelEdit = () => {
   currentArticleId.value = null // 重置编辑状态
 }
 
+// 打开删除确认模态框
+const openDeleteModal = (article) => {
+  console.log('Opening delete modal for article:', article.title)
+  articleToDelete.value = article
+  showDeleteModal.value = true
+}
+
+// 关闭删除确认模态框
+const closeDeleteModal = () => {
+  console.log('Closing delete modal')
+  showDeleteModal.value = false
+  articleToDelete.value = null
+}
+
+// 确认删除文章
+const confirmDelete = () => {
+  if (articleToDelete.value) {
+    console.log('Confirming delete for article:', articleToDelete.value.title)
+    articles.value = articles.value.filter(a => a.id !== articleToDelete.value.id)
+    alert(`文章: ${articleToDelete.value.title} 已删除`)
+    saveArticles()
+    closeDeleteModal()
+  }
+}
+
+// 旧的删除文章函数（保留作为备份）
 const handleDeleteArticle = (article) => {
-  if (confirm(`确定要删除文章: ${article.title}吗？`)) {
+  console.log('Delete article called:', article.title)
+  const confirmed = confirm(`确定要删除文章: ${article.title}吗？`)
+  console.log('Confirm result:', confirmed)
+  if (confirmed) {
+    console.log('Deleting article:', article.title)
     articles.value = articles.value.filter(a => a.id !== article.id)
     alert(`文章: ${article.title} 已删除`)
     saveArticles()
+  } else {
+    console.log('Delete cancelled for article:', article.title)
   }
 }
 
@@ -1079,7 +1137,7 @@ onMounted(() => {
   // 启动文字动画
   animateText()
 
-  // 监听滚动，实现滚动检测
+  // 监听滚动，实现滚动检测和进度计算
   window.addEventListener('scroll', () => {
     const scrollY = window.scrollY
     // 检测是否滚动超过阈值
@@ -1088,6 +1146,11 @@ onMounted(() => {
     } else {
       isScrolled.value = false
     }
+    
+    // 计算滚动进度
+    const totalHeight = document.documentElement.scrollHeight - window.innerHeight
+    const progress = (scrollY / totalHeight) * 100
+    scrollProgress.value = Math.min(Math.max(progress, 0), 100)
   })
   
   // 初始化主题模式
@@ -1106,8 +1169,27 @@ onMounted(() => {
   width: 100%;
   min-height: 100vh;
   font-family: 'PingFang SC', 'Montserrat', 'Ma Shan Zheng', cursive, sans-serif;
-  background: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=misty%20forest%20with%20sunlight%20streaming%20through%20trees%2C%20peaceful%20natural%20landscape&image_size=landscape_16_9') no-repeat center center fixed;
+  background: url('@/assets/images/backgrounds/light-bg.jpg');
   background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+  color: #333333;
+}
+
+.portal-view.dark {
+  background: url('@/assets/images/backgrounds/dark-bg.jpg');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+  color: #eaeaea;
+}
+
+.portal-view.black {
+  background: url('@/assets/images/backgrounds/black-bg.jpg');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+  color: #e0e0e0;
 }
 
 /* 导航栏 */
@@ -1119,16 +1201,18 @@ onMounted(() => {
   z-index: 999;
   background-color: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateY(0);
 }
 
 /* 滚动时的导航栏样式 */
 .portal-nav.scrolled {
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transform: translateY(-5px);
 }
 
 .portal-nav.scrolled .logo {
@@ -1210,6 +1294,16 @@ onMounted(() => {
 
 .nav-link:hover::after {
   width: 100%;
+}
+
+.nav-link.active {
+  color: #4a6fa5;
+  font-weight: 600;
+}
+
+.nav-link.active::after {
+  width: 100%;
+  background-color: #4a6fa5;
 }
 
 .search-btn {
@@ -1344,14 +1438,16 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.85);
+  background: transparent;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=misty%20forest%20with%20sunlight%20streaming%20through%20trees%2C%20peaceful%20natural%20landscape&image_size=landscape_16_9');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+}
+
+.portal-view.dark .blog-container {
+  background: transparent;
+}
+
+.portal-view.black .blog-container {
+  background: transparent;
 }
 
 /* 左侧侧边栏 */
@@ -1367,19 +1463,51 @@ onMounted(() => {
   font-size: 16px;
   font-weight: bold;
   color: inherit;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 8px;
   margin-bottom: 12px;
 }
 
+.portal-view.dark .module-title {
+  border-bottom: 1px solid #333333;
+}
+
+.portal-view.black .module-title {
+  border-bottom: 1px solid #222222;
+}
+
 /* 侧边栏模块 */
 .sidebar-module {
-  background: rgba(255, 255, 255, 0.9);
+  background: #ffffff;
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(-30px) scale(0.9);
+  animation: fadeInLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.sidebar-module:hover {
+  transform: translateX(5px) scale(1.02);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes fadeInLeft {
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.portal-view.dark .sidebar-module {
+  background: #181818;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.portal-view.black .sidebar-module {
+  background: #111111;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* 公告栏 */
@@ -1504,7 +1632,7 @@ onMounted(() => {
 /* 统计数据 */
 .profile-stats {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   margin: 16px 0;
   padding: 12px;
   background: rgba(255, 255, 255, 0.1);
@@ -1512,21 +1640,31 @@ onMounted(() => {
 }
 
 .stat-item {
+  flex: 1;
   text-align: center;
+  padding: 0 10px;
 }
 
 .stat-number {
   display: block;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
   color: white;
+  margin-bottom: 4px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-label {
   display: block;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
-  margin-top: 4px;
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 功能链接 */
@@ -2395,15 +2533,86 @@ onMounted(() => {
 /* 主内容区 */
 .main-content {
   flex: 7;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
-  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=misty%20forest%20with%20sunlight%20streaming%20through%20trees%2C%20peaceful%20natural%20landscape&image_size=landscape_16_9');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+}
+
+/* 文章卡片主题适配 */
+.portal-view.dark .article-card {
+  background: rgba(24, 24, 24, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.portal-view.black .article-card {
+  background: rgba(17, 17, 17, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.portal-view.dark .article-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.portal-view.black .article-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.portal-view.dark .article-title {
+  color: #e9ecef;
+}
+
+.portal-view.dark .article-card:hover .article-title {
+  color: #6b8cce;
+  text-shadow: 0 1px 2px rgba(107, 140, 206, 0.2);
+}
+
+.portal-view.dark .article-meta {
+  color: #999999;
+  border-bottom: 1px solid #333333;
+}
+
+.portal-view.dark .article-excerpt {
+  color: #ced4da;
+}
+
+.portal-view.black .article-title {
+  color: #e0e0e0;
+}
+
+.portal-view.black .article-card:hover .article-title {
+  color: #6b8cce;
+}
+
+.portal-view.black .article-meta {
+  color: #888888;
+  border-bottom: 1px solid #222222;
+}
+
+.portal-view.black .article-excerpt {
+  color: #bdbdbd;
+}
+
+.portal-view.dark .article-footer {
+  border-top: 1px solid #333333;
+  color: #999999;
+}
+
+.portal-view.dark .footer-item {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.portal-view.dark .footer-item:hover {
+  background-color: rgba(107, 140, 206, 0.1);
+}
+
+.portal-view.black .article-footer {
+  border-top: 1px solid #222222;
+  color: #888888;
+}
+
+.portal-view.black .footer-item {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.portal-view.black .footer-item:hover {
+  background-color: rgba(107, 140, 206, 0.1);
 }
 
 /* 右下角图标 */
@@ -2417,6 +2626,121 @@ onMounted(() => {
   z-index: 998;
 }
 
+/* 进度条图标 */
+.progress-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.progress-icon:active {
+  transform: scale(0.9);
+}
+
+.progress-circle {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #4a6fa5 calc(var(--progress) * 1%), 
+    #6b8cce calc(var(--progress) * 1%), 
+    rgba(255, 255, 255, 0.1) 0%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+  transition: all 0.5s ease;
+  animation: pulse 2s infinite, rotate 10s linear infinite;
+  cursor: pointer;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.progress-circle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 24px rgba(74, 111, 165, 0.6);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 24px rgba(74, 111, 165, 0.6);
+  }
+  100% {
+    box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+  }
+}
+
+.progress-circle::before {
+  content: '';
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: white;
+  z-index: 1;
+}
+
+.portal-view.dark .progress-circle::before {
+  background: #181818;
+}
+
+.portal-view.black .progress-circle::before {
+  background: #111111;
+}
+
+.progress-text {
+  position: relative;
+  z-index: 2;
+  font-size: 14px;
+  font-weight: bold;
+  color: #4a6fa5;
+  transition: all 0.3s ease;
+  animation: textPulse 1s infinite;
+}
+
+.progress-text:hover {
+  transform: scale(1.1);
+  color: #3a5a85;
+}
+
+.portal-view.dark .progress-text,
+.portal-view.black .progress-text {
+  color: #6b8cce;
+}
+
+.portal-view.dark .progress-text:hover,
+.portal-view.black .progress-text:hover {
+  color: #4a6fa5;
+}
+
+@keyframes textPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .icon-btn {
   width: 48px;
   height: 48px;
@@ -2425,17 +2749,23 @@ onMounted(() => {
   border-radius: 50%;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(10px);
+  transform: scale(1);
 }
 
 .icon-btn:hover {
   background: rgba(255, 255, 255, 1);
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-6px) scale(1.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.icon-btn:active {
+  transform: translateY(0) scale(0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .icon {
@@ -2543,6 +2873,89 @@ onMounted(() => {
   
   .icon {
     font-size: 16px;
+  }
+}
+
+/* 删除确认模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.modal-message {
+  margin-bottom: 24px;
+  color: #666;
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.action-btn.danger {
+  background-color: #f44336;
+  color: white;
+  border: none;
+}
+
+.action-btn.danger:hover {
+  background-color: #da190b;
+  transform: translateY(-2px);
+}
+
+/* 响应式设计 - 模态框 */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    padding: 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions button {
+    width: 100%;
   }
 }
 </style>
