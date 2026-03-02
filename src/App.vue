@@ -25,7 +25,7 @@
               <router-link to="/blog" class="nav-link">杂谈</router-link>
               <router-link to="/life" class="nav-link">生活</router-link>
               <router-link to="/learn" class="nav-link">Learn</router-link>
-              <router-link to="/build" class="nav-link">建站</router-link>
+
             </nav>
             <button class="mode-toggle" @click="toggleMode" aria-label="切换主题模式">
               <span v-if="currentMode === 'light'" class="mode-icon sun">☀️</span>

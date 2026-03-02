@@ -330,6 +330,22 @@ const formatDate = (dateString) => {
 const convertMarkdownToHtml = (markdown) => {
   if (markdown === undefined || markdown === null) return '<p>无内容</p>'
   
+  // 图片（支持大小调整语法：![alt](url =widthxheight) 或 ![alt](url width=300 height=200)）
+  markdown = markdown.replace(/!\[(.*?)\]\((.*?)(?:\s*=\s*(\d+)x(\d+))?\)/gim, (match, alt, url, width, height) => {
+    // 确保url被正确处理，特别是base64编码
+    const safeUrl = url.trim();
+    if (width && height) {
+      return `<img src="${safeUrl}" alt="${alt}" width="${width}" height="${height}" class="markdown-image">`;
+    } else {
+      return `<img src="${safeUrl}" alt="${alt}" class="markdown-image">`;
+    }
+  })
+  // 处理另一种格式：![alt](url width=300 height=200)
+  markdown = markdown.replace(/!\[(.*?)\]\((.*?)\s+width=(\d+)\s+height=(\d+)\)/gim, (match, alt, url, width, height) => {
+    const safeUrl = url.trim();
+    return `<img src="${safeUrl}" alt="${alt}" width="${width}" height="${height}" class="markdown-image">`;
+  })
+  
   // 标题
   markdown = markdown.replace(/^# (.*$)/gim, '<h1>$1</h1>')
   markdown = markdown.replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -342,8 +358,8 @@ const convertMarkdownToHtml = (markdown) => {
   paragraphs.forEach(paragraph => {
     paragraph = paragraph.trim()
     if (paragraph) {
-      // 检查是否已经是标题
-      if (!paragraph.startsWith('<h1>') && !paragraph.startsWith('<h2>') && !paragraph.startsWith('<h3>')) {
+      // 检查是否已经是标题或图片
+      if (!paragraph.startsWith('<h1>') && !paragraph.startsWith('<h2>') && !paragraph.startsWith('<h3>') && !paragraph.startsWith('<img')) {
         html += `<p>${paragraph}</p>`
       } else {
         html += paragraph
@@ -795,7 +811,8 @@ onMounted(() => {
   font-weight: 400;
 }
 
-.article-content img {
+.article-content img,
+.article-content .markdown-image {
   max-width: 100%;
   height: auto;
   border-radius: 8px;

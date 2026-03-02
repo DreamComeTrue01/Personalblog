@@ -1,5 +1,10 @@
 <template>
   <div class="portal-view" data-route="/" :class="currentMode">
+    <!-- 通知组件 -->
+    <div v-if="showNotification" class="notification" :class="notificationType">
+      {{ notificationMessage }}
+    </div>
+    
     <!-- 导航栏 -->
     <header class="portal-nav" :class="{ 'scrolled': isScrolled }">
       <div class="nav-content">
@@ -221,12 +226,27 @@
                       
                       <!-- 文章内容（Markdown编辑器） -->
                       <div class="editor-section">
+                        <div class="editor-toolbar">
+                          <button class="toolbar-btn" @click="triggerImageUpload" title="上传图片">
+                            🖼️ 上传图片
+                          </button>
+                          <button class="toolbar-btn" @click="openImageManager" title="管理图片">
+                            📷 管理图片
+                          </button>
+                        </div>
                         <textarea 
                           v-model="articleContent" 
                           placeholder="请输入文章内容（支持Markdown格式）" 
                           class="csdn-editor-textarea"
                           rows="15"
                         ></textarea>
+                        <input 
+                          type="file" 
+                          ref="imageInput" 
+                          accept="image/*" 
+                          @change="handleImageUpload" 
+                          style="display: none;"
+                        >
                       </div>
                       
                       <!-- 操作按钮 -->
@@ -411,6 +431,10 @@
         <button class="icon-btn" aria-label="设置" @click="openSettings">
           <span class="icon">⚙️</span>
         </button>
+        <button class="icon-btn" aria-label="音乐" @click="toggleMusic">
+          <span class="icon" v-if="isMusicPlaying">🎵</span>
+          <span class="icon" v-else>🎶</span>
+        </button>
       </div>
     </section>
 
@@ -422,6 +446,281 @@
         <div class="modal-actions">
           <button class="action-btn" @click="closeDeleteModal">取消</button>
           <button class="action-btn danger" @click="confirmDelete">确认删除</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 图片管理模态框 -->
+    <div v-if="showImageManager" class="modal-overlay" @click="closeImageManager">
+      <div class="modal-content image-manager-modal" @click.stop>
+        <h3 class="modal-title">图片管理</h3>
+        <div class="image-list">
+          <div v-for="(image, index) in articleImages" :key="index" class="image-item">
+            <div class="image-preview">
+              <img :src="image.url" :alt="image.alt" class="preview-img">
+            </div>
+            <div class="image-controls">
+              <div class="size-controls">
+                <div class="size-group">
+                  <label>宽度:</label>
+                  <input type="number" v-model.number="image.width" class="size-input" @input="previewImageSize(index)">
+                  <input type="range" v-model.number="image.width" class="size-slider" min="100" max="1000" @input="previewImageSize(index)">
+                </div>
+                <div class="size-group">
+                  <label>高度:</label>
+                  <input type="number" v-model.number="image.height" class="size-input" @input="previewImageSize(index)">
+                  <input type="range" v-model.number="image.height" class="size-slider" min="100" max="1000" @input="previewImageSize(index)">
+                </div>
+              </div>
+              <div class="preset-sizes">
+                <button class="preset-btn" @click="setPresetSize(index, 300, 200)">300x200</button>
+                <button class="preset-btn" @click="setPresetSize(index, 500, 300)">500x300</button>
+                <button class="preset-btn" @click="setPresetSize(index, 800, 500)">800x500</button>
+                <button class="preset-btn" @click="resetImageSize(index)">重置</button>
+              </div>
+              <div class="image-actions">
+                <button class="action-btn csdn-primary" @click="updateImageSize(index)">更新尺寸</button>
+                <button class="action-btn csdn-delete" @click="removeImage(index)">删除图片</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="articleImages.length === 0" class="no-images">
+            文章中暂无图片
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="action-btn" @click="closeImageManager">关闭</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 设置模态框 -->
+    <div v-if="showSettingsModal" class="modal-overlay" @click="closeSettingsModal">
+      <div class="modal-content settings-modal" @click.stop>
+        <h3 class="modal-title">设置</h3>
+        <div class="settings-content">
+          <!-- 音乐设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">音乐设置</h4>
+            <div class="setting-item">
+              <label>音乐音量</label>
+              <div class="volume-control">
+                <input type="range" v-model.number="musicVolume" class="volume-slider" min="0" max="1" step="0.05" @input="updateMusicVolume">
+                <span class="volume-value">{{ Math.round(musicVolume * 100) }}%</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>自动播放音乐</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="autoPlayMusic" v-model="autoPlayMusic">
+                <label for="autoPlayMusic" class="toggle-label"></label>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 主题设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">主题设置</h4>
+            <div class="theme-options">
+              <button class="theme-option" :class="{ active: currentMode === 'light' }" @click="currentMode = 'light'; localStorage.setItem('blogMode', 'light'); window.dispatchEvent(new Event('storage'))">
+                <span class="theme-icon">☀️</span>
+                <span class="theme-name">浅色模式</span>
+              </button>
+              <button class="theme-option" :class="{ active: currentMode === 'dark' }" @click="currentMode = 'dark'; localStorage.setItem('blogMode', 'dark'); window.dispatchEvent(new Event('storage'))">
+                <span class="theme-icon">🌙</span>
+                <span class="theme-name">深色模式</span>
+              </button>
+              <button class="theme-option" :class="{ active: currentMode === 'black' }" @click="currentMode = 'black'; localStorage.setItem('blogMode', 'black'); window.dispatchEvent(new Event('storage'))">
+                <span class="theme-icon">⚫</span>
+                <span class="theme-name">黑色模式</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- 显示设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">显示设置</h4>
+            <div class="setting-item">
+              <label>字体大小</label>
+              <div class="font-size-options">
+                <button class="font-size-btn" :class="{ active: fontSize === 'small' }" @click="fontSize = 'small'; applyFontSize()">小</button>
+                <button class="font-size-btn" :class="{ active: fontSize === 'medium' }" @click="fontSize = 'medium'; applyFontSize()">中</button>
+                <button class="font-size-btn" :class="{ active: fontSize === 'large' }" @click="fontSize = 'large'; applyFontSize()">大</button>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>动画效果</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="enableAnimations" v-model="enableAnimations">
+                <label for="enableAnimations" class="toggle-label"></label>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 通知设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">通知设置</h4>
+            <div class="setting-item">
+              <label>启用通知</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="enableNotifications" v-model="enableNotifications">
+                <label for="enableNotifications" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>评论通知</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="commentNotifications" v-model="commentNotifications">
+                <label for="commentNotifications" class="toggle-label"></label>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 语言设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">语言设置</h4>
+            <div class="setting-item">
+              <label>网站语言</label>
+              <select v-model="language" class="setting-select">
+                <option value="zh-CN">简体中文</option>
+                <option value="en-US">English</option>
+                <option value="ja-JP">日本語</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- 时间格式设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">时间格式</h4>
+            <div class="setting-item">
+              <label>日期格式</label>
+              <select v-model="dateFormat" class="setting-select">
+                <option value="YYYY-MM-DD">2026-02-24</option>
+                <option value="MM-DD-YYYY">02-24-2026</option>
+                <option value="DD/MM/YYYY">24/02/2026</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- 文章阅读设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">文章阅读</h4>
+            <div class="setting-item">
+              <label>文章排序</label>
+              <select v-model="articleSort" class="setting-select">
+                <option value="latest">最新优先</option>
+                <option value="oldest">最早优先</option>
+                <option value="popular">热门优先</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- 侧边栏设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">侧边栏</h4>
+            <div class="setting-item">
+              <label>显示公告栏</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="showAnnouncement" v-model="showAnnouncement">
+                <label for="showAnnouncement" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>显示导航菜单</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="showNavigation" v-model="showNavigation">
+                <label for="showNavigation" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>显示个人简介</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="showProfile" v-model="showProfile">
+                <label for="showProfile" class="toggle-label"></label>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 数据管理 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">数据管理</h4>
+            <div class="setting-item">
+              <label>清理缓存</label>
+              <button class="action-btn csdn-primary" @click="clearCache">清理</button>
+            </div>
+            <div class="setting-item">
+              <label>数据导出</label>
+              <button class="action-btn csdn-primary" @click="exportData">导出</button>
+            </div>
+            <div class="setting-item">
+              <label>数据导入</label>
+              <button class="action-btn csdn-primary" @click="triggerImport">导入</button>
+              <input type="file" ref="importInput" accept=".json" @change="importData" style="display: none;">
+            </div>
+          </div>
+          
+          <!-- 快捷键设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">快捷键</h4>
+            <div class="keyboard-shortcuts">
+              <div class="shortcut-item">
+                <span class="shortcut-action">新建文章</span>
+                <span class="shortcut-key">Ctrl + N</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="shortcut-action">搜索</span>
+                <span class="shortcut-key">Ctrl + F</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="shortcut-action">返回顶部</span>
+                <span class="shortcut-key">Ctrl + ↑</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="shortcut-action">切换主题</span>
+                <span class="shortcut-key">Ctrl + T</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 隐私设置 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">隐私设置</h4>
+            <div class="setting-item">
+              <label>允许数据分析</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="allowAnalytics" v-model="enableNotifications">
+                <label for="allowAnalytics" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>允许Cookie</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="allowCookies" v-model="enableNotifications">
+                <label for="allowCookies" class="toggle-label"></label>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 关于 -->
+          <div class="setting-section">
+            <h4 class="setting-section-title">关于</h4>
+            <div class="about-info">
+              <p><strong>Dream's Blog</strong></p>
+              <p>版本: 1.0.0</p>
+              <p>一个个人博客网站，记录生活和学习</p>
+              <button class="action-btn csdn-primary" @click="showAboutDetails = !showAboutDetails">查看更多</button>
+              <div v-if="showAboutDetails" class="about-details">
+                <p>© 2026 Dream's Blog. All rights reserved.</p>
+                <p>使用 Vue 3 + Vite 构建</p>
+                <p>支持 Markdown 编辑</p>
+                <p>响应式设计，适配各种设备</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="action-btn" @click="closeSettingsModal">取消</button>
+          <button class="action-btn csdn-primary" @click="applySettings">保存设置</button>
         </div>
       </div>
     </div>
@@ -450,6 +749,16 @@ const currentArticleId = ref(null)
 // 拖放上传相关
 const isDragging = ref(false)
 const fileInput = ref(null)
+// 图片上传相关
+const imageInput = ref(null)
+// 导入数据相关
+const importInput = ref(null)
+// 图片管理相关
+const showImageManager = ref(false)
+const articleImages = ref([])
+// 音乐播放相关
+const isMusicPlaying = ref(false)
+let audio = null
 // 删除确认模态框相关
 const showDeleteModal = ref(false)
 const articleToDelete = ref(null)
@@ -592,9 +901,190 @@ const toggleMode = () => {
   window.dispatchEvent(new Event('storage'))
 }
 
+// 设置相关
+const showSettingsModal = ref(false)
+const musicVolume = ref(0.25)
+const autoPlayMusic = ref(false)
+const fontSize = ref('medium')
+const enableAnimations = ref(true)
+const enableNotifications = ref(true)
+const commentNotifications = ref(true)
+const showAboutDetails = ref(false)
+const language = ref('zh-CN')
+const dateFormat = ref('YYYY-MM-DD')
+const articleSort = ref('latest')
+const showAnnouncement = ref(true)
+const showNavigation = ref(true)
+const showProfile = ref(true)
+
+// 通知相关
+const showNotification = ref(false)
+const notificationMessage = ref('')
+const notificationType = ref('success')
+
+// 显示通知
+const showToast = (message, type = 'success') => {
+  notificationMessage.value = message
+  notificationType.value = type
+  showNotification.value = true
+  
+  // 3秒后自动关闭通知
+  setTimeout(() => {
+    showNotification.value = false
+  }, 3000)
+}
+
 // 打开设置
 const openSettings = () => {
-  alert('设置功能开发中...')
+  // 同步当前音乐音量
+  if (audio) {
+    musicVolume.value = audio.volume
+  }
+  showSettingsModal.value = true
+}
+
+// 关闭设置
+const closeSettingsModal = () => {
+  showSettingsModal.value = false
+}
+
+// 应用设置
+const applySettings = () => {
+  // 保存音乐音量
+  if (audio) {
+    audio.volume = musicVolume.value
+  }
+  // 应用字体大小
+  applyFontSize()
+  // 保存设置到localStorage
+  const settings = {
+    musicVolume: musicVolume.value,
+    autoPlayMusic: autoPlayMusic.value,
+    fontSize: fontSize.value,
+    enableAnimations: enableAnimations.value,
+    enableNotifications: enableNotifications.value,
+    commentNotifications: commentNotifications.value,
+    language: language.value,
+    dateFormat: dateFormat.value,
+    articleSort: articleSort.value,
+    showAnnouncement: showAnnouncement.value,
+    showNavigation: showNavigation.value,
+    showProfile: showProfile.value
+  }
+  localStorage.setItem('blogSettings', JSON.stringify(settings))
+  closeSettingsModal()
+  showToast('设置已保存')
+}
+
+// 实时更新音乐音量
+const updateMusicVolume = () => {
+  if (audio) {
+    audio.volume = musicVolume.value
+  }
+}
+
+// 应用字体大小
+const applyFontSize = () => {
+  document.documentElement.style.fontSize = fontSize.value === 'small' ? '14px' : fontSize.value === 'large' ? '18px' : '16px'
+}
+
+// 清理缓存
+const clearCache = () => {
+  if (confirm('确定要清理缓存吗？这将删除所有本地存储的数据。')) {
+    localStorage.clear()
+    showToast('缓存已清理，请刷新页面以应用更改。')
+  }
+}
+
+// 导出数据
+const exportData = () => {
+  const data = {
+    articles: articles.value,
+    categories: categories.value,
+    tags: tags.value,
+    userSettings: userSettings.value,
+    settings: {
+      musicVolume: musicVolume.value,
+      autoPlayMusic: autoPlayMusic.value,
+      fontSize: fontSize.value,
+      enableAnimations: enableAnimations.value,
+      enableNotifications: enableNotifications.value,
+      commentNotifications: commentNotifications.value,
+      language: language.value,
+      dateFormat: dateFormat.value,
+      articleSort: articleSort.value,
+      showAnnouncement: showAnnouncement.value,
+      showNavigation: showNavigation.value,
+      showProfile: showProfile.value
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `blog-data-${new Date().toISOString().split('T')[0]}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  showToast('数据导出成功')
+}
+
+// 触发导入
+const triggerImport = () => {
+  if (importInput.value) {
+    importInput.value.click()
+  }
+}
+
+// 导入数据
+const importData = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result)
+      if (confirm('确定要导入数据吗？这将覆盖当前所有数据。')) {
+        if (data.articles) {
+          articles.value = data.articles
+          saveArticles()
+        }
+        if (data.categories) {
+          categories.value = data.categories
+        }
+        if (data.tags) {
+          tags.value = data.tags
+        }
+        if (data.userSettings) {
+          userSettings.value = data.userSettings
+          localStorage.setItem('userSettings', JSON.stringify(userSettings.value))
+        }
+        if (data.settings) {
+          musicVolume.value = data.settings.musicVolume || 0.25
+          autoPlayMusic.value = data.settings.autoPlayMusic || false
+          fontSize.value = data.settings.fontSize || 'medium'
+          enableAnimations.value = data.settings.enableAnimations || true
+          enableNotifications.value = data.settings.enableNotifications || true
+          commentNotifications.value = data.settings.commentNotifications || true
+          language.value = data.settings.language || 'zh-CN'
+          dateFormat.value = data.settings.dateFormat || 'YYYY-MM-DD'
+          articleSort.value = data.settings.articleSort || 'latest'
+          showAnnouncement.value = data.settings.showAnnouncement || true
+          showNavigation.value = data.settings.showNavigation || true
+          showProfile.value = data.settings.showProfile || true
+          applyFontSize()
+        }
+        showToast('数据导入成功，请刷新页面以应用更改。')
+      }
+    } catch (error) {
+      showToast('数据导入失败，请确保文件格式正确。', 'error')
+      console.error('数据导入失败:', error)
+    }
+  }
+  reader.onerror = () => {
+    showToast('文件读取失败', 'error')
+  }
+  reader.readAsText(file)
 }
 
 // 切换下拉菜单
@@ -620,7 +1110,13 @@ const handleNewArticle = () => {
 
 const handleEditArticle = (article) => {
   currentArticleTitle.value = article.title
-  articleContent.value = article.content
+  // 处理article.content为undefined的情况
+  if (article.content !== undefined && article.content !== null) {
+    articleContent.value = article.content
+  } else {
+    // 如果没有content字段，使用excerpt作为内容
+    articleContent.value = article.excerpt ? `# ${article.title}\n\n${article.excerpt}` : '# 文章内容\n\n这是文章的默认内容...'
+  }
   // 保存当前编辑的文章ID
   currentArticleId.value = article.id
   isEditing.value = true
@@ -628,11 +1124,11 @@ const handleEditArticle = (article) => {
 
 const handleSaveArticle = () => {
   if (currentArticleTitle.value.trim() === '') {
-    alert('请输入文章标题')
+    showToast('请输入文章标题', 'error')
     return
   }
   if (articleContent.value.trim() === '') {
-    alert('请输入文章内容')
+    showToast('请输入文章内容', 'error')
     return
   }
 
@@ -643,9 +1139,11 @@ const handleSaveArticle = () => {
       articles.value[index] = {
         ...articles.value[index],
         title: currentArticleTitle.value,
-        content: articleContent.value
+        content: articleContent.value,
+        // 重新生成摘要
+        excerpt: articleContent.value.substring(0, 100) + '...'
       }
-      alert(`文章 "${currentArticleTitle.value}" 已更新`)
+      showToast(`文章 "${currentArticleTitle.value}" 已更新`)
       saveArticles()
     }
   } else {
@@ -661,7 +1159,7 @@ const handleSaveArticle = () => {
       stats: { likes: 0, comments: 0 } // 默认统计数据
     }
     articles.value.push(newArticle)
-    alert(`文章 "${newArticle.title}" 已创建`)
+    showToast(`文章 "${newArticle.title}" 已创建`)
     saveArticles()
   }
 
@@ -672,6 +1170,248 @@ const handleSaveArticle = () => {
 const handleCancelEdit = () => {
   isEditing.value = false
   currentArticleId.value = null // 重置编辑状态
+}
+
+// 触发图片上传
+const triggerImageUpload = () => {
+  if (imageInput.value) {
+    imageInput.value.click()
+  }
+}
+
+// 处理图片上传
+const handleImageUpload = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  // 检查文件类型
+  if (!file.type.startsWith('image/')) {
+    showToast('请选择图片文件', 'error')
+    return
+  }
+  
+  // 检查文件大小（限制为 5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('图片大小不能超过 5MB', 'error')
+    return
+  }
+  
+  // 压缩图片
+  const compressImage = (file, maxWidth = 800, maxHeight = 600, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      
+      img.onload = () => {
+        // 计算压缩后的尺寸
+        let width = img.width
+        let height = img.height
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+        
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height
+          height = maxHeight
+        }
+        
+        // 设置canvas尺寸
+        canvas.width = width
+        canvas.height = height
+        
+        // 绘制压缩后的图片
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // 转换为base64编码
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+        resolve(compressedDataUrl)
+      }
+      
+      img.onerror = reject
+      img.src = URL.createObjectURL(file)
+    })
+  }
+  
+  // 压缩并上传图片
+  compressImage(file)
+    .then((compressedImageUrl) => {
+      // 直接插入默认尺寸的图片
+      const imageMarkdown = `![图片](${compressedImageUrl})\n\n`
+      articleContent.value += imageMarkdown
+      showToast('图片上传成功，已插入到文章内容中')
+    })
+    .catch((error) => {
+      console.error('图片压缩失败:', error)
+      showToast('图片上传失败，请重试', 'error')
+    })
+}
+
+// 打开图片管理模态框
+const openImageManager = () => {
+  // 从文章内容中提取图片
+  extractImages()
+  showImageManager.value = true
+}
+
+// 关闭图片管理模态框
+const closeImageManager = () => {
+  showImageManager.value = false
+}
+
+// 从文章内容中提取图片
+const extractImages = () => {
+  const content = articleContent.value
+  const imageMatches = content.match(/!\[(.*?)\]\((.*?)(?:\s*=\s*(\d+)x(\d+))?\)/gim)
+  const images = []
+  
+  if (imageMatches) {
+    imageMatches.forEach(match => {
+      const matchResult = match.match(/!\[(.*?)\]\((.*?)(?:\s*=\s*(\d+)x(\d+))?\)/)
+      if (matchResult) {
+        const [, alt, url, width, height] = matchResult
+        images.push({
+          alt: alt || '图片',
+          url: url,
+          width: width ? parseInt(width) : 0,
+          height: height ? parseInt(height) : 0,
+          originalMatch: match
+        })
+      }
+    })
+  }
+  
+  articleImages.value = images
+}
+
+// 更新图片尺寸
+const updateImageSize = (index) => {
+  const image = articleImages.value[index]
+  if (!image) return
+  
+  let newMarkdown
+  if (image.width > 0 && image.height > 0) {
+    newMarkdown = `![${image.alt}](${image.url} =${image.width}x${image.height})`
+  } else {
+    newMarkdown = `![${image.alt}](${image.url})`
+  }
+  
+  // 替换文章内容中的图片Markdown
+  articleContent.value = articleContent.value.replace(image.originalMatch, newMarkdown)
+  
+  // 更新图片的原始匹配
+  image.originalMatch = newMarkdown
+  
+  showToast('图片尺寸已更新')
+}
+
+// 删除图片
+const removeImage = (index) => {
+  const image = articleImages.value[index]
+  if (!image) return
+  
+  // 从文章内容中删除图片Markdown
+  articleContent.value = articleContent.value.replace(image.originalMatch, '')
+  
+  // 从图片列表中删除
+  articleImages.value.splice(index, 1)
+  
+  showToast('图片已删除')
+}
+
+// 实时预览图片尺寸
+const previewImageSize = (index) => {
+  const image = articleImages.value[index]
+  if (!image) return
+  
+  // 更新预览图片的尺寸
+  const previewImg = document.querySelector(`.image-item:nth-child(${index + 1}) .preview-img`)
+  if (previewImg) {
+    if (image.width > 0 && image.height > 0) {
+      previewImg.style.width = `${image.width}px`
+      previewImg.style.height = `${image.height}px`
+    } else {
+      previewImg.style.width = 'auto'
+      previewImg.style.height = 'auto'
+    }
+  }
+}
+
+// 设置预设尺寸
+const setPresetSize = (index, width, height) => {
+  const image = articleImages.value[index]
+  if (!image) return
+  
+  // 设置预设尺寸
+  image.width = width
+  image.height = height
+  
+  // 实时预览
+  previewImageSize(index)
+}
+
+// 重置图片尺寸
+const resetImageSize = (index) => {
+  const image = articleImages.value[index]
+  if (!image) return
+  
+  // 重置尺寸
+  image.width = 0
+  image.height = 0
+  
+  // 实时预览
+  previewImageSize(index)
+}
+
+// 初始化音频对象
+const initAudio = () => {
+  if (!audio) {
+    // 使用本地音乐文件
+    audio = new Audio('/src/assets/music/background-music.mp3')
+    audio.volume = 0.25 // 设置音量为25%
+    audio.loop = true // 循环播放
+    
+    // 监听播放结束事件
+    audio.addEventListener('ended', () => {
+      isMusicPlaying.value = false
+    })
+  }
+}
+
+// 切换音乐播放/暂停
+const toggleMusic = () => {
+  initAudio()
+  
+  if (isMusicPlaying.value) {
+    audio.pause()
+    isMusicPlaying.value = false
+    console.log('音乐已暂停')
+  } else {
+    audio.play().then(() => {
+      isMusicPlaying.value = true
+      console.log('音乐已播放')
+    }).catch(error => {
+      console.log('播放失败:', error)
+      isMusicPlaying.value = false
+    })
+  }
+  
+  console.log('isMusicPlaying:', isMusicPlaying.value)
+}
+
+// 页面加载时自动播放音乐
+const playMusicOnLoad = () => {
+  initAudio()
+  audio.play().then(() => {
+    isMusicPlaying.value = true
+    console.log('音乐自动播放成功')
+  }).catch(error => {
+    console.log('自动播放被阻止:', error)
+    isMusicPlaying.value = false
+    // 自动播放可能会被浏览器阻止，所以提供一个手动播放按钮
+  })
 }
 
 // 打开删除确认模态框
@@ -693,7 +1433,7 @@ const confirmDelete = () => {
   if (articleToDelete.value) {
     console.log('Confirming delete for article:', articleToDelete.value.title)
     articles.value = articles.value.filter(a => a.id !== articleToDelete.value.id)
-    alert(`文章: ${articleToDelete.value.title} 已删除`)
+    showToast(`文章: ${articleToDelete.value.title} 已删除`)
     saveArticles()
     closeDeleteModal()
   }
@@ -707,7 +1447,7 @@ const handleDeleteArticle = (article) => {
   if (confirmed) {
     console.log('Deleting article:', article.title)
     articles.value = articles.value.filter(a => a.id !== article.id)
-    alert(`文章: ${article.title} 已删除`)
+    showToast(`文章: ${article.title} 已删除`)
     saveArticles()
   } else {
     console.log('Delete cancelled for article:', article.title)
@@ -733,7 +1473,7 @@ const handleFileSelect = (event) => {
 const processFile = (file) => {
   // 检查文件类型
   if (!file.name.endsWith('.md') && !file.name.endsWith('.markdown')) {
-    alert('请上传 .md 或 .markdown 文件')
+    showToast('请上传 .md 或 .markdown 文件', 'error')
     return
   }
 
@@ -741,10 +1481,31 @@ const processFile = (file) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     const content = e.target.result
-    articleContent.value = content
+    
+    // 处理本地图片路径
+    let processedContent = content
+    
+    // 检测MD文件中的图片引用
+    const imageMatches = content.match(/!\[(.*?)\]\(([^\)]+)\)/gim)
+    if (imageMatches) {
+      imageMatches.forEach(match => {
+        // 提取图片路径
+        const pathMatch = match.match(/!\[(.*?)\]\(([^\)]+)\)/)
+        if (pathMatch && pathMatch[2]) {
+          const imagePath = pathMatch[2]
+          // 检查是否是本地图片路径（不是http/https开头）
+          if (!imagePath.startsWith('http://') && !imagePath.startsWith('https://')) {
+            // 提示用户需要上传图片
+            showToast('MD文件中包含本地图片引用，请确保图片已上传到可访问的位置，并使用完整的URL路径。', 'warning')
+          }
+        }
+      })
+    }
+    
+    articleContent.value = processedContent
     
     // 自动提取标题（如果文件以 # 开头）
-    const titleMatch = content.match(/^#\s+(.+)$/m)
+    const titleMatch = processedContent.match(/^#\s+(.+)$/m)
     if (titleMatch && !currentArticleTitle.value) {
       currentArticleTitle.value = titleMatch[1]
     }
@@ -753,7 +1514,7 @@ const processFile = (file) => {
     // uploadFileToBackend(file)
   }
   reader.onerror = () => {
-    alert('文件读取失败')
+    showToast('文件读取失败', 'error')
   }
   reader.readAsText(file)
 }
@@ -792,7 +1553,7 @@ const handleEditCategory = (category) => {
 
 const handleSaveCategory = () => {
   if (currentCategory.value.name.trim() === '') {
-    alert('请输入分类名称')
+    showToast('请输入分类名称', 'error')
     return
   }
 
@@ -801,7 +1562,7 @@ const handleSaveCategory = () => {
     const index = categories.value.findIndex(cat => cat.id === currentCategory.value.id)
     if (index !== -1) {
       categories.value[index] = { ...currentCategory.value }
-      alert(`分类 "${currentCategory.value.name}" 已更新`)
+      showToast(`分类 "${currentCategory.value.name}" 已更新`)
       // 预留后端接口调用（后期实现）
       // updateCategoryToBackend(currentCategory.value)
     }
@@ -813,7 +1574,7 @@ const handleSaveCategory = () => {
       name: currentCategory.value.name
     }
     categories.value.push(newCategory)
-    alert(`分类 "${newCategory.name}" 已创建`)
+    showToast(`分类 "${newCategory.name}" 已创建`)
     // 预留后端接口调用（后期实现）
     // createCategoryToBackend(newCategory)
   }
@@ -828,7 +1589,7 @@ const handleCancelCategoryEdit = () => {
 const handleDeleteCategory = (category) => {
   if (confirm(`确定要删除分类: ${category.name}吗？`)) {
     categories.value = categories.value.filter(cat => cat.id !== category.id)
-    alert(`分类: ${category.name} 已删除`)
+    showToast(`分类: ${category.name} 已删除`)
     // 预留后端接口调用（后期实现）
     // deleteCategoryFromBackend(category.id)
   }
@@ -909,7 +1670,7 @@ const handleEditTag = (tag) => {
 
 const handleSaveTag = () => {
   if (currentTag.value.name.trim() === '') {
-    alert('请输入标签名称')
+    showToast('请输入标签名称', 'error')
     return
   }
 
@@ -918,7 +1679,7 @@ const handleSaveTag = () => {
     const index = tags.value.findIndex(t => t.id === currentTag.value.id)
     if (index !== -1) {
       tags.value[index] = { ...currentTag.value }
-      alert(`标签 "${currentTag.value.name}" 已更新`)
+      showToast(`标签 "${currentTag.value.name}" 已更新`)
       // 预留后端接口调用（后期实现）
       // updateTagToBackend(currentTag.value)
     }
@@ -930,7 +1691,7 @@ const handleSaveTag = () => {
       name: currentTag.value.name
     }
     tags.value.push(newTag)
-    alert(`标签 "${newTag.name}" 已创建`)
+    showToast(`标签 "${newTag.name}" 已创建`)
     // 预留后端接口调用（后期实现）
     // createTagToBackend(newTag)
   }
@@ -945,7 +1706,7 @@ const handleCancelTagEdit = () => {
 const handleDeleteTag = (tag) => {
   if (confirm(`确定要删除标签: ${tag.name}吗？`)) {
     tags.value = tags.value.filter(t => t.id !== tag.id)
-    alert(`标签: ${tag.name} 已删除`)
+    showToast(`标签: ${tag.name} 已删除`)
     // 预留后端接口调用（后期实现）
     // deleteTagFromBackend(tag.id)
   }
@@ -1019,17 +1780,17 @@ const handleSaveProfile = () => {
   localStorage.setItem('userSettings', JSON.stringify(userSettings.value))
   // 预留后端接口调用（后期实现）
   // updateUserSettingsToBackend(userSettings.value)
-  alert('个人设置已保存并同步')
+  showToast('个人设置已保存并同步')
 }
 
 const handleCancelProfileEdit = () => {
   // 重新加载设置
   loadUserSettings()
-  alert('已取消更改')
+  showToast('已取消更改')
 }
 
 const handleSaveSite = () => {
-  alert('站点设置已保存')
+  showToast('站点设置已保存')
 }
 
 const triggerFileInput = () => {
@@ -1043,13 +1804,13 @@ const handleAvatarUpload = (event) => {
   
   // 检查文件类型
   if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
+    showToast('请选择图片文件', 'error')
     return
   }
   
   // 检查文件大小（限制为 5MB）
   if (file.size > 5 * 1024 * 1024) {
-    alert('图片大小不能超过 5MB')
+    showToast('图片大小不能超过 5MB', 'error')
     return
   }
   
@@ -1058,12 +1819,12 @@ const handleAvatarUpload = (event) => {
   reader.onload = (e) => {
     // 使用 data URL 作为头像
     userSettings.value.avatar = e.target.result
-    alert('头像已更新')
+    showToast('头像已更新')
     // 预留后端接口调用（后期实现）
     // uploadAvatarToBackend(file)
   }
   reader.onerror = () => {
-    alert('图片读取失败')
+    showToast('图片读取失败', 'error')
   }
   reader.readAsDataURL(file)
 }
@@ -1131,6 +1892,9 @@ onMounted(() => {
   // 加载用户设置
   loadUserSettings()
   
+  // 加载保存的设置
+  loadSettings()
+  
   // 加载文章数据
   loadArticles()
   
@@ -1158,7 +1922,39 @@ onMounted(() => {
   if (savedMode) {
     currentMode.value = savedMode
   }
+  
+  // 应用字体大小
+  applyFontSize()
+  
+  // 页面加载时自动播放音乐
+  if (autoPlayMusic.value) {
+    playMusicOnLoad()
+  }
 })
+
+// 加载保存的设置
+const loadSettings = () => {
+  const savedSettings = localStorage.getItem('blogSettings')
+  if (savedSettings) {
+    try {
+      const settings = JSON.parse(savedSettings)
+      musicVolume.value = settings.musicVolume || 0.25
+      autoPlayMusic.value = settings.autoPlayMusic || false
+      fontSize.value = settings.fontSize || 'medium'
+      enableAnimations.value = settings.enableAnimations || true
+      enableNotifications.value = settings.enableNotifications || true
+      commentNotifications.value = settings.commentNotifications || true
+      language.value = settings.language || 'zh-CN'
+      dateFormat.value = settings.dateFormat || 'YYYY-MM-DD'
+      articleSort.value = settings.articleSort || 'latest'
+      showAnnouncement.value = settings.showAnnouncement || true
+      showNavigation.value = settings.showNavigation || true
+      showProfile.value = settings.showProfile || true
+    } catch (error) {
+      console.error('加载设置失败:', error)
+    }
+  }
+}
 </script>
 
 <style scoped>
@@ -2068,6 +2864,45 @@ onMounted(() => {
   object-fit: cover;
 }
 
+/* 编辑器工具栏 */
+.editor-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  z-index: 1;
+}
+
+.toolbar-btn {
+  padding: 10px 20px;
+  background: #4a6fa5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-btn:hover {
+  background: #3a5a85;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+}
+
+.toolbar-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .feature-item {
@@ -2116,6 +2951,345 @@ onMounted(() => {
     width: 80px;
     height: 80px;
   }
+  
+  .editor-toolbar {
+    flex-wrap: wrap;
+  }
+  
+  .toolbar-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+/* 图片管理模态框 */
+.image-manager-modal {
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.image-list {
+  margin: 20px 0;
+}
+
+.image-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #e0e0e0;
+}
+
+.image-preview {
+  flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.image-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.size-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.size-controls label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  min-width: 60px;
+}
+
+.size-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.size-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  min-width: 60px;
+}
+
+.size-input {
+  width: 100px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.size-input:focus {
+  outline: none;
+  border-color: #4a6fa5;
+  box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.1);
+}
+
+.size-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #ddd;
+  outline: none;
+  -webkit-appearance: none;
+  transition: all 0.3s ease;
+}
+
+.size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a6fa5;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.size-slider::-webkit-slider-thumb:hover {
+  background: #3a5a85;
+  transform: scale(1.1);
+}
+
+.size-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a6fa5;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.size-slider::-moz-range-thumb:hover {
+  background: #3a5a85;
+  transform: scale(1.1);
+}
+
+.preset-sizes {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: #333;
+}
+
+.preset-btn:hover {
+  background: #e9ecef;
+  border-color: #4a6fa5;
+  color: #4a6fa5;
+  transform: translateY(-2px);
+}
+
+.preset-btn:active {
+  transform: translateY(0);
+}
+
+.image-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.no-images {
+  text-align: center;
+  padding: 40px 0;
+  color: #666;
+  font-size: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 2px dashed #e0e0e0;
+}
+
+/* 设置模态框 */
+.settings-modal {
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.settings-content {
+  margin: 20px 0;
+}
+
+.setting-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.setting-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.setting-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-section-title::before {
+  content: '⚙️';
+  font-size: 18px;
+}
+
+.setting-item {
+  margin-bottom: 16px;
+}
+
+.setting-item label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.volume-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #ddd;
+  outline: none;
+  -webkit-appearance: none;
+  transition: all 0.3s ease;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a6fa5;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  background: #3a5a85;
+  transform: scale(1.1);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a6fa5;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  background: #3a5a85;
+  transform: scale(1.1);
+}
+
+.volume-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4a6fa5;
+  min-width: 60px;
+  text-align: right;
+}
+
+/* 主题选项 */
+.theme-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.theme-option {
+  flex: 1;
+  min-width: 120px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.theme-option:hover {
+  border-color: #4a6fa5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.2);
+}
+
+.theme-option.active {
+  background: #4a6fa5;
+  border-color: #4a6fa5;
+  color: white;
+  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
+}
+
+.theme-icon {
+  display: block;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.theme-name {
+  display: block;
+  font-size: 12px;
 }
 
 /* 淡入动画 */
@@ -2127,6 +3301,139 @@ onMounted(() => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* 设置选择框样式 */
+.setting-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dark .setting-select,
+.black .setting-select {
+  background: #444;
+  border-color: #666;
+  color: #eaeaea;
+}
+
+.setting-select:hover {
+  border-color: #4a6fa5;
+  box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+}
+
+/* 快捷键设置样式 */
+.keyboard-shortcuts {
+  margin-top: 10px;
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .shortcut-item,
+.black .shortcut-item {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.shortcut-key {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.dark .shortcut-key,
+.black .shortcut-key {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 深色模式下的设置样式 */
+.dark .setting-section-title,
+.black .setting-section-title {
+  color: #eaeaea;
+}
+
+.dark .setting-item label,
+.black .setting-item label {
+  color: #eaeaea;
+}
+
+.dark .setting-section,
+.black .setting-section {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 通知组件样式 */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+  max-width: 300px;
+}
+
+.notification.success {
+  background-color: #4caf50;
+}
+
+.notification.error {
+  background-color: #f44336;
+}
+
+.notification.warning {
+  background-color: #ff9800;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 响应式设置模态框 */
+@media (max-width: 768px) {
+  .settings-modal {
+    width: 95%;
+    max-width: 95%;
+  }
+  
+  .theme-options {
+    flex-direction: column;
+  }
+  
+  .theme-option {
+    min-width: 100%;
+  }
+  
+  .notification {
+    left: 20px;
+    right: 20px;
+    max-width: none;
   }
 }
 

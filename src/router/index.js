@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import PortalView from '../views/PortalView.vue'
 import ArticleDetailView from '../views/ArticleDetailView.vue'
 import LifeView from '../views/LifeView.vue'
+import LifeDetailView from '../views/LifeDetailView.vue'
 import ArchiveView from '../views/ArchiveView.vue'
 import AboutView from '../views/AboutView.vue'
 import MessageView from '../views/MessageView.vue'
@@ -24,6 +25,11 @@ const router = createRouter({
       path: '/life',
       name: 'life',
       component: LifeView
+    },
+    {
+      path: '/life/:id',
+      name: 'life-detail',
+      component: LifeDetailView
     },
     {
       path: '/learn',
