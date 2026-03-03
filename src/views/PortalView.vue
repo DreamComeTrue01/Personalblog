@@ -72,10 +72,10 @@
           <div class="sidebar-module navigation" style="animation-delay: 0.2s;">
             <h3 class="module-title">导航菜单</h3>
             <ul class="nav-menu">
-              <li><a href="#" class="nav-item">首页</a></li>
-              <li><a href="#" class="nav-item">文章</a></li>
-              <li><a href="#" class="nav-item">说说</a></li>
-              <li><a href="#" class="nav-item">归档</a></li>
+              <li><router-link to="/" class="nav-item">首页</router-link></li>
+              <li><router-link to="/blog" class="nav-item">文章</router-link></li>
+              <li><router-link to="/life" class="nav-item">说说</router-link></li>
+              <li><router-link to="/archive" class="nav-item">归档</router-link></li>
             </ul>
           </div>
           
@@ -147,259 +147,285 @@
             
             <!-- 功能内容 -->
             <div v-if="activeTab === 'features'" class="tab-content">
-              <div class="features-list csdn-style">
-                <div class="feature-item csdn-item" @click="activeFeature = 'article'">
-                  <span class="feature-icon">📝</span>
-                  <span class="feature-text">文章管理</span>
+              <div v-if="!isAuthenticated" class="auth-required">
+                <div class="auth-message">
+                  <h4>需要登录</h4>
+                  <p>请登录后访问功能管理</p>
+                  <button class="action-btn csdn-primary" @click="login">登录</button>
                 </div>
-                <div class="feature-item csdn-item" @click="activeFeature = 'category'">
-                  <span class="feature-icon">📁</span>
-                  <span class="feature-text">分类管理</span>
-                </div>
-                <div class="feature-item csdn-item" @click="activeFeature = 'tag'">
-                  <span class="feature-icon">🏷️</span>
-                  <span class="feature-text">标签管理</span>
-                </div>
-                <div class="feature-item csdn-item" @click="activeFeature = 'profile'">
-                  <span class="feature-icon">👤</span>
-                  <span class="feature-text">个人设置</span>
-                </div>
-                <div class="feature-item csdn-item" @click="activeFeature = 'site'">
-                  <span class="feature-icon">⚙️</span>
-                  <span class="feature-text">站点设置</span>
+                
+                <!-- 登录表单 -->
+                <div v-if="showLoginForm" class="login-form">
+                  <h4>管理员登录</h4>
+                  <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" v-model="loginPassword" placeholder="请输入管理员密码" class="form-input">
+                  </div>
+                  <div class="form-actions">
+                    <button class="action-btn csdn-primary" @click="submitLogin">登录</button>
+                    <button class="action-btn csdn-cancel" @click="cancelLogin">取消</button>
+                  </div>
                 </div>
               </div>
-              
-              <!-- 功能操作界面 -->
-              <div class="feature-content" v-if="activeFeature">
-                <!-- 文章管理 -->
-                <div v-if="activeFeature === 'article'" class="feature-panel csdn-panel">
-                  <!-- 文章列表 -->
-                  <div v-if="!isEditing" class="csdn-article-management">
-                    <h4 class="panel-title csdn-panel-title">文章管理</h4>
-                    <div class="panel-content csdn-panel-content">
-                      <button class="action-btn csdn-primary" @click="handleNewArticle">+ 新建文章</button>
-                      <div class="article-list-admin csdn-article-list">
-                        <div v-for="article in articles" :key="article.id" class="article-item csdn-article-item">
-                          <div class="article-info csdn-article-info">
-                            <h5>{{ article.title }}</h5>
-                            <p>{{ formatDate(article.date) }}</p>
-                          </div>
-                          <div class="article-actions csdn-article-actions">
-                            <button class="action-btn csdn-edit" @click="handleEditArticle(article)">编辑</button>
-                            <button class="action-btn csdn-delete" @click="openDeleteModal(article)">删除</button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+              <div v-else class="authenticated-content">
+                <div class="features-list csdn-style">
+                  <div class="feature-item csdn-item" @click="activeFeature = 'article'">
+                    <span class="feature-icon">📝</span>
+                    <span class="feature-text">文章管理</span>
                   </div>
-                  
-                  <!-- 编辑文章界面 -->
-                  <div v-else class="csdn-article-editor">
-                    <h4 class="panel-title csdn-panel-title">{{ currentArticleTitle ? '编辑文章' : '新建文章' }}</h4>
-                    <div class="panel-content csdn-panel-content csdn-editor-content">
-                      <!-- 文章标题 -->
-                      <div class="editor-section">
-                        <input 
-                          type="text" 
-                          v-model="currentArticleTitle" 
-                          placeholder="请输入文章标题" 
-                          class="csdn-editor-title"
-                        >
-                      </div>
-                      
-                      <!-- 拖放上传区域 -->
-                      <div 
-                        class="editor-section drag-drop-zone" 
-                        @dragover.prevent @dragenter.prevent @drop.prevent="handleFileDrop"
-                      >
-                        <div class="drag-drop-content" :class="{ 'dragging': isDragging }">
-                          <span class="drag-drop-icon">📄</span>
-                          <h5>拖放MD文件到此处上传</h5>
-                          <p>或者 <label class="browse-label">
-                            <input type="file" accept=".md,.markdown" @change="handleFileSelect" style="display: none;">
-                            浏览文件
-                          </label></p>
-                          <p class="drag-drop-hint">支持 .md 和 .markdown 文件</p>
-                        </div>
-                      </div>
-                      
-                      <!-- 文章内容（Markdown编辑器） -->
-                      <div class="editor-section">
-                        <div class="editor-toolbar">
-                          <button class="toolbar-btn" @click="triggerImageUpload" title="上传图片">
-                            🖼️ 上传图片
-                          </button>
-                          <button class="toolbar-btn" @click="openImageManager" title="管理图片">
-                            📷 管理图片
-                          </button>
-                        </div>
-                        <textarea 
-                          v-model="articleContent" 
-                          placeholder="请输入文章内容（支持Markdown格式）" 
-                          class="csdn-editor-textarea"
-                          rows="15"
-                        ></textarea>
-                        <input 
-                          type="file" 
-                          ref="imageInput" 
-                          accept="image/*" 
-                          @change="handleImageUpload" 
-                          style="display: none;"
-                        >
-                      </div>
-                      
-                      <!-- 操作按钮 -->
-                      <div class="editor-actions">
-                        <button class="action-btn csdn-primary" @click="handleSaveArticle">保存文章</button>
-                        <button class="action-btn csdn-cancel" @click="handleCancelEdit">取消</button>
-                      </div>
-                    </div>
+                  <div class="feature-item csdn-item" @click="activeFeature = 'category'">
+                    <span class="feature-icon">📁</span>
+                    <span class="feature-text">分类管理</span>
+                  </div>
+                  <div class="feature-item csdn-item" @click="activeFeature = 'tag'">
+                    <span class="feature-icon">🏷️</span>
+                    <span class="feature-text">标签管理</span>
+                  </div>
+                  <div class="feature-item csdn-item" @click="activeFeature = 'profile'">
+                    <span class="feature-icon">👤</span>
+                    <span class="feature-text">个人设置</span>
+                  </div>
+                  <div class="feature-item csdn-item" @click="activeFeature = 'site'">
+                    <span class="feature-icon">⚙️</span>
+                    <span class="feature-text">站点设置</span>
+                  </div>
+                  <div class="feature-item csdn-item" @click="logout">
+                    <span class="feature-icon">🚪</span>
+                    <span class="feature-text">退出登录</span>
                   </div>
                 </div>
                 
-                <!-- 分类管理 -->
-                <div v-if="activeFeature === 'category'" class="feature-panel csdn-panel">
-                  <!-- 分类列表 -->
-                  <div v-if="!isEditingCategory" class="csdn-category-management">
-                    <h4 class="panel-title csdn-panel-title">分类管理</h4>
-                    <div class="panel-content csdn-panel-content">
-                      <button class="action-btn csdn-primary" @click="handleNewCategory">+ 新建分类</button>
-                      <div class="category-list csdn-category-list">
-                        <div v-for="category in categories" :key="category.id" class="category-item csdn-category-item">
-                          <span>{{ category.name }}</span>
-                          <div class="category-actions csdn-category-actions">
-                            <button class="action-btn csdn-edit" @click="handleEditCategory(category)">编辑</button>
-                            <button class="action-btn csdn-delete" @click="handleDeleteCategory(category)">删除</button>
+                <!-- 功能操作界面 -->
+                <div class="feature-content" v-if="activeFeature">
+                  <!-- 文章管理 -->
+                  <div v-if="activeFeature === 'article'" class="feature-panel csdn-panel">
+                    <!-- 文章列表 -->
+                    <div v-if="!isEditing" class="csdn-article-management">
+                      <h4 class="panel-title csdn-panel-title">文章管理</h4>
+                      <div class="panel-content csdn-panel-content">
+                        <button class="action-btn csdn-primary" @click="handleNewArticle">+ 新建文章</button>
+                        <div class="article-list-admin csdn-article-list">
+                          <div v-for="article in articles" :key="article.id" class="article-item csdn-article-item">
+                            <div class="article-info csdn-article-info">
+                              <h5>{{ article.title }}</h5>
+                              <p>{{ formatDate(article.date) }}</p>
+                            </div>
+                            <div class="article-actions csdn-article-actions">
+                              <button class="action-btn csdn-edit" @click="handleEditArticle(article)">编辑</button>
+                              <button class="action-btn csdn-delete" @click="openDeleteModal(article)">删除</button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <!-- 编辑分类界面 -->
-                  <div v-else class="csdn-category-editor">
-                    <h4 class="panel-title csdn-panel-title">{{ currentCategory.id ? '编辑分类' : '新建分类' }}</h4>
-                    <div class="panel-content csdn-panel-content csdn-editor-content">
-                      <!-- 分类名称 -->
-                      <div class="editor-section">
-                        <input 
-                          type="text" 
-                          v-model="currentCategory.name" 
-                          placeholder="请输入分类名称" 
-                          class="csdn-editor-title"
+                    
+                    <!-- 编辑文章界面 -->
+                    <div v-else class="csdn-article-editor">
+                      <h4 class="panel-title csdn-panel-title">{{ currentArticleTitle ? '编辑文章' : '新建文章' }}</h4>
+                      <div class="panel-content csdn-panel-content csdn-editor-content">
+                        <!-- 文章标题 -->
+                        <div class="editor-section">
+                          <input 
+                            type="text" 
+                            v-model="currentArticleTitle" 
+                            placeholder="请输入文章标题" 
+                            class="csdn-editor-title"
+                          >
+                        </div>
+                        
+                        <!-- 拖放上传区域 -->
+                        <div 
+                          class="editor-section drag-drop-zone" 
+                          @dragover.prevent @dragenter.prevent @drop.prevent="handleFileDrop"
                         >
-                      </div>
-                      
-                      <!-- 操作按钮 -->
-                      <div class="editor-actions">
-                        <button class="action-btn csdn-primary" @click="handleSaveCategory">保存分类</button>
-                        <button class="action-btn csdn-cancel" @click="handleCancelCategoryEdit">取消</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- 标签管理 -->
-                <div v-if="activeFeature === 'tag'" class="feature-panel csdn-panel">
-                  <!-- 标签列表 -->
-                  <div v-if="!isEditingTag" class="csdn-tag-management">
-                    <h4 class="panel-title csdn-panel-title">标签管理</h4>
-                    <div class="panel-content csdn-panel-content">
-                      <button class="action-btn csdn-primary" @click="handleNewTag">+ 新建标签</button>
-                      <div class="tag-list csdn-tag-list">
-                        <div v-for="tag in tags" :key="tag.id" class="tag-item csdn-tag-item">
-                          <span>{{ tag.name }}</span>
-                          <div class="tag-actions csdn-tag-actions">
-                            <button class="action-btn csdn-edit" @click="handleEditTag(tag)">编辑</button>
-                            <button class="action-btn csdn-delete" @click="handleDeleteTag(tag)">删除</button>
+                          <div class="drag-drop-content" :class="{ 'dragging': isDragging }">
+                            <span class="drag-drop-icon">📄</span>
+                            <h5>拖放MD文件到此处上传</h5>
+                            <p>或者 <label class="browse-label">
+                              <input type="file" accept=".md,.markdown" @change="handleFileSelect" style="display: none;">
+                              浏览文件
+                            </label></p>
+                            <p class="drag-drop-hint">支持 .md 和 .markdown 文件</p>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- 编辑标签界面 -->
-                  <div v-else class="csdn-tag-editor">
-                    <h4 class="panel-title csdn-panel-title">{{ currentTag.id ? '编辑标签' : '新建标签' }}</h4>
-                    <div class="panel-content csdn-panel-content csdn-editor-content">
-                      <!-- 标签名称 -->
-                      <div class="editor-section">
-                        <input 
-                          type="text" 
-                          v-model="currentTag.name" 
-                          placeholder="请输入标签名称" 
-                          class="csdn-editor-title"
-                        >
-                      </div>
-                      
-                      <!-- 操作按钮 -->
-                      <div class="editor-actions">
-                        <button class="action-btn csdn-primary" @click="handleSaveTag">保存标签</button>
-                        <button class="action-btn csdn-cancel" @click="handleCancelTagEdit">取消</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- 个人设置 -->
-                <div v-if="activeFeature === 'profile'" class="feature-panel csdn-panel">
-                  <h4 class="panel-title csdn-panel-title">个人设置</h4>
-                  <div class="panel-content csdn-panel-content">
-                    <div class="setting-item">
-                      <label>用户名</label>
-                      <input type="text" v-model="userSettings.username" class="csdn-editor-title">
-                    </div>
-                    <div class="setting-item">
-                      <label>个人描述</label>
-                      <input type="text" v-model="userSettings.description" class="csdn-editor-title">
-                    </div>
-                    <div class="setting-item">
-                      <label>头像</label>
-                      <div class="avatar-upload">
-                        <div class="current-avatar">
-                          <img :src="userSettings.avatar" alt="Avatar">
-                        </div>
-                        <div class="avatar-upload-actions">
-                          <button class="action-btn csdn-edit" @click="triggerFileInput">选择图片</button>
+                        
+                        <!-- 文章内容（Markdown编辑器） -->
+                        <div class="editor-section">
+                          <div class="editor-toolbar">
+                            <button class="toolbar-btn" @click="triggerImageUpload" title="上传图片">
+                              🖼️ 上传图片
+                            </button>
+                            <button class="toolbar-btn" @click="openImageManager" title="管理图片">
+                              📷 管理图片
+                            </button>
+                          </div>
+                          <textarea 
+                            v-model="articleContent" 
+                            placeholder="请输入文章内容（支持Markdown格式）" 
+                            class="csdn-editor-textarea"
+                            rows="15"
+                          ></textarea>
                           <input 
                             type="file" 
-                            ref="fileInput" 
+                            ref="imageInput" 
                             accept="image/*" 
-                            @change="handleAvatarUpload" 
+                            @change="handleImageUpload" 
                             style="display: none;"
                           >
                         </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="editor-actions">
+                          <button class="action-btn csdn-primary" @click="handleSaveArticle">保存文章</button>
+                          <button class="action-btn csdn-cancel" @click="handleCancelEdit">取消</button>
+                        </div>
                       </div>
                     </div>
-                    <div class="editor-actions">
-                      <button class="action-btn csdn-primary" @click="handleSaveProfile">保存设置</button>
-                      <button class="action-btn csdn-cancel" @click="handleCancelProfileEdit">取消</button>
+                  </div>
+                  
+                  <!-- 分类管理 -->
+                  <div v-if="activeFeature === 'category'" class="feature-panel csdn-panel">
+                    <!-- 分类列表 -->
+                    <div v-if="!isEditingCategory" class="csdn-category-management">
+                      <h4 class="panel-title csdn-panel-title">分类管理</h4>
+                      <div class="panel-content csdn-panel-content">
+                        <button class="action-btn csdn-primary" @click="handleNewCategory">+ 新建分类</button>
+                        <div class="category-list csdn-category-list">
+                          <div v-for="category in categories" :key="category.id" class="category-item csdn-category-item">
+                            <span>{{ category.name }}</span>
+                            <div class="category-actions csdn-category-actions">
+                              <button class="action-btn csdn-edit" @click="handleEditCategory(category)">编辑</button>
+                              <button class="action-btn csdn-delete" @click="handleDeleteCategory(category)">删除</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 编辑分类界面 -->
+                    <div v-else class="csdn-category-editor">
+                      <h4 class="panel-title csdn-panel-title">{{ currentCategory.id ? '编辑分类' : '新建分类' }}</h4>
+                      <div class="panel-content csdn-panel-content csdn-editor-content">
+                        <!-- 分类名称 -->
+                        <div class="editor-section">
+                          <input 
+                            type="text" 
+                            v-model="currentCategory.name" 
+                            placeholder="请输入分类名称" 
+                            class="csdn-editor-title"
+                          >
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="editor-actions">
+                          <button class="action-btn csdn-primary" @click="handleSaveCategory">保存分类</button>
+                          <button class="action-btn csdn-cancel" @click="handleCancelCategoryEdit">取消</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <!-- 站点设置 -->
-                <div v-if="activeFeature === 'site'" class="feature-panel">
-                  <h4 class="panel-title">站点设置</h4>
-                  <div class="panel-content">
-                    <div class="setting-item">
-                      <label>站点标题</label>
-                      <input type="text" value="Dream's blog" class="setting-input">
+                  
+                  <!-- 标签管理 -->
+                  <div v-if="activeFeature === 'tag'" class="feature-panel csdn-panel">
+                    <!-- 标签列表 -->
+                    <div v-if="!isEditingTag" class="csdn-tag-management">
+                      <h4 class="panel-title csdn-panel-title">标签管理</h4>
+                      <div class="panel-content csdn-panel-content">
+                        <button class="action-btn csdn-primary" @click="handleNewTag">+ 新建标签</button>
+                        <div class="tag-list csdn-tag-list">
+                          <div v-for="tag in tags" :key="tag.id" class="tag-item csdn-tag-item">
+                            <span>{{ tag.name }}</span>
+                            <div class="tag-actions csdn-tag-actions">
+                              <button class="action-btn csdn-edit" @click="handleEditTag(tag)">编辑</button>
+                              <button class="action-btn csdn-delete" @click="handleDeleteTag(tag)">删除</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="setting-item">
-                      <label>站点描述</label>
-                      <input type="text" value="Life is a coding, I will debug it." class="setting-input">
+                    
+                    <!-- 编辑标签界面 -->
+                    <div v-else class="csdn-tag-editor">
+                      <h4 class="panel-title csdn-panel-title">{{ currentTag.id ? '编辑标签' : '新建标签' }}</h4>
+                      <div class="panel-content csdn-panel-content csdn-editor-content">
+                        <!-- 标签名称 -->
+                        <div class="editor-section">
+                          <input 
+                            type="text" 
+                            v-model="currentTag.name" 
+                            placeholder="请输入标签名称" 
+                            class="csdn-editor-title"
+                          >
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="editor-actions">
+                          <button class="action-btn csdn-primary" @click="handleSaveTag">保存标签</button>
+                          <button class="action-btn csdn-cancel" @click="handleCancelTagEdit">取消</button>
+                        </div>
+                      </div>
                     </div>
-                    <div class="setting-item">
-                      <label>主题模式</label>
-                      <select class="setting-select">
-                        <option>浅色模式</option>
-                        <option>深色模式</option>
-                        <option>黑色模式</option>
-                      </select>
+                  </div>
+                  
+                  <!-- 个人设置 -->
+                  <div v-if="activeFeature === 'profile'" class="feature-panel csdn-panel">
+                    <h4 class="panel-title csdn-panel-title">个人设置</h4>
+                    <div class="panel-content csdn-panel-content">
+                      <div class="setting-item">
+                        <label>用户名</label>
+                        <input type="text" v-model="userSettings.username" class="csdn-editor-title">
+                      </div>
+                      <div class="setting-item">
+                        <label>个人描述</label>
+                        <input type="text" v-model="userSettings.description" class="csdn-editor-title">
+                      </div>
+                      <div class="setting-item">
+                        <label>头像</label>
+                        <div class="avatar-upload">
+                          <div class="current-avatar">
+                            <img :src="userSettings.avatar" alt="Avatar">
+                          </div>
+                          <div class="avatar-upload-actions">
+                            <button class="action-btn csdn-edit" @click="triggerFileInput">选择图片</button>
+                            <input 
+                              type="file" 
+                              ref="fileInput" 
+                              accept="image/*" 
+                              @change="handleAvatarUpload" 
+                              style="display: none;"
+                            >
+                          </div>
+                        </div>
+                      </div>
+                      <div class="editor-actions">
+                        <button class="action-btn csdn-primary" @click="handleSaveProfile">保存设置</button>
+                        <button class="action-btn csdn-cancel" @click="handleCancelProfileEdit">取消</button>
+                      </div>
                     </div>
-                    <button class="action-btn primary save" @click="handleSaveSite">保存设置</button>
+                  </div>
+                  
+                  <!-- 站点设置 -->
+                  <div v-if="activeFeature === 'site'" class="feature-panel">
+                    <h4 class="panel-title">站点设置</h4>
+                    <div class="panel-content">
+                      <div class="setting-item">
+                        <label>站点标题</label>
+                        <input type="text" value="Dream's blog" class="setting-input">
+                      </div>
+                      <div class="setting-item">
+                        <label>站点描述</label>
+                        <input type="text" value="Life is a coding, I will debug it." class="setting-input">
+                      </div>
+                      <div class="setting-item">
+                        <label>主题模式</label>
+                        <select class="setting-select">
+                          <option>浅色模式</option>
+                          <option>深色模式</option>
+                          <option>黑色模式</option>
+                        </select>
+                      </div>
+                      <button class="action-btn primary save" @click="handleSaveSite">保存设置</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -765,6 +791,11 @@ const articleToDelete = ref(null)
 // 导入头像图片
 import avatarImage from '@/assets/images/avatar.png'
 
+// 权限验证相关
+const isAuthenticated = ref(localStorage.getItem('isAuthenticated') === 'true')
+const showLoginForm = ref(false)
+const loginPassword = ref('')
+
 // 个人设置相关
 const userSettings = ref({
   username: 'Dream',
@@ -1090,6 +1121,39 @@ const importData = (event) => {
 // 切换下拉菜单
 const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value
+}
+
+// 权限验证方法
+const login = () => {
+  console.log('登录按钮被点击')
+  showLoginForm.value = true
+}
+
+const submitLogin = () => {
+  console.log('提交登录，密码:', loginPassword.value)
+  if (loginPassword.value === 'admin123') { // 临时密码，实际项目中应该使用加密存储
+    isAuthenticated.value = true
+    localStorage.setItem('isAuthenticated', 'true')
+    showLoginForm.value = false
+    loginPassword.value = ''
+    console.log('登录成功，isAuthenticated:', isAuthenticated.value)
+    showToast('登录成功')
+  } else {
+    console.log('密码错误')
+    showToast('密码错误', 'error')
+  }
+}
+
+const cancelLogin = () => {
+  showLoginForm.value = false
+  loginPassword.value = ''
+}
+
+const logout = () => {
+  isAuthenticated.value = false
+  localStorage.removeItem('isAuthenticated')
+  activeFeature.value = ''
+  showToast('已退出登录')
 }
 
 // 功能操作方法
@@ -2578,6 +2642,134 @@ const loadSettings = () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 权限验证区域 */
+.auth-required {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  background: rgba(74, 111, 165, 0.1);
+  border: 2px dashed rgba(74, 111, 165, 0.5);
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+  padding: 40px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-required::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(74, 111, 165, 0.05), rgba(74, 111, 165, 0.15));
+  border-radius: 8px;
+  z-index: -1;
+}
+
+.auth-message {
+  text-align: center;
+  max-width: 300px;
+  position: relative;
+  z-index: 2;
+}
+
+.auth-message h4 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #4a6fa5;
+  margin-bottom: 12px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.auth-message p {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 24px;
+  line-height: 1.5;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.auth-message button {
+  position: relative;
+  z-index: 3;
+  cursor: pointer;
+}
+
+/* 登录表单 */
+.login-form {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #4a6fa5;
+  border-radius: 12px;
+  padding: 32px;
+  width: 90%;
+  max-width: 350px;
+  box-shadow: 0 8px 24px rgba(74, 111, 165, 0.3);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  animation: fadeIn 0.3s ease;
+}
+
+.login-form h4 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #4a6fa5;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: #fafafa;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4a6fa5;
+  box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
+  background: white;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.form-actions button {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 /* 功能列表 */
