@@ -29,6 +29,9 @@ public class Article {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "is_archived")
+    private boolean isArchived = false;
+    
     @ManyToMany
     @JoinTable(
         name = "article_categories",
@@ -69,6 +72,9 @@ public class Article {
     
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    
+    public boolean isArchived() { return isArchived; }
+    public void setArchived(boolean archived) { isArchived = archived; }
     
     public List<Category> getCategories() { return categories; }
     public void setCategories(List<Category> categories) { this.categories = categories; }

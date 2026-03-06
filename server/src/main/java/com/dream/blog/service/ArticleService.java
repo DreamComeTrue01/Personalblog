@@ -24,6 +24,10 @@ public class ArticleService {
         return articleRepository.findAll();
     }
     
+    public List<Article> getArchivedArticles() {
+        return articleRepository.findByIsArchivedTrue();
+    }
+    
     public Optional<Article> getArticleById(Integer id) {
         return articleRepository.findById(id);
     }
